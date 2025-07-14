@@ -23,13 +23,13 @@ const (
 
 func init() {
 	if endpoint := os.Getenv("LOCAL_ENDPOINT"); endpoint != "" {
+		logging.Info("LOCAL_ENDPOINT detected", "endpoint", endpoint)
+		
 		localEndpoint, err := url.Parse(endpoint)
 		if err != nil {
-			logging.Debug("Failed to parse local endpoint",
-				"error", err,
-				"endpoint", endpoint,
-			)
-			return
+			logging.Debug("Failed to parse local endpoint", "error", err, "endpoint", endpoint)
+			// 파싱 실패시 하드코딩 모델 사용
+			goto hardcoded
 		}
 
 		load := func(url *url.URL, path string) []localModel {
@@ -38,20 +38,36 @@ func init() {
 		}
 
 		models := load(localEndpoint, lmStudioBetaModelsPath)
-
 		if len(models) == 0 {
 			models = load(localEndpoint, localModelsPath)
 		}
 
 		if len(models) == 0 {
-			logging.Debug("No local models found",
-				"endpoint", endpoint,
-			)
-			return
+			logging.Debug("No local models found, using hardcoded model", "endpoint", endpoint)
+			goto hardcoded
 		}
 
 		loadLocalModels(models)
+		viper.SetDefault("providers.local.apiKey", "dummy")
+		ProviderPopularity[ProviderLocal] = 0
+		logging.Info("Successfully loaded local models", "count", len(models))
+		return
 
+	hardcoded:
+		// 자동 발견 실패시 하드코딩 모델 사용
+		logging.Info("Using hardcoded Qwen3-32B model")
+		qwenModel := localModel{
+			ID:                  "Qwen3-32B",
+			Object:              "model",
+			Type:                "llm",
+			State:               "loaded",
+			MaxContextLength:    32768,
+			LoadedContextLength: 32768,
+		}
+		
+		models := []localModel{qwenModel}
+		loadLocalModels(models)
+		
 		viper.SetDefault("providers.local.apiKey", "dummy")
 		ProviderPopularity[ProviderLocal] = 0
 	}
@@ -75,30 +91,35 @@ type localModel struct {
 }
 
 func listLocalModels(modelsEndpoint string) []localModel {
-	res, err := http.Get(modelsEndpoint)
+	// HTTP 클라이언트 생성
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", modelsEndpoint, nil)
 	if err != nil {
-		logging.Debug("Failed to list local models",
-			"error", err,
-			"endpoint", modelsEndpoint,
-		)
+		logging.Debug("Failed to create request", "error", err, "endpoint", modelsEndpoint)
+		return []localModel{}
+	}
+	
+	// 사내 API와 동일한 헤더 추가
+	req.Header.Set("Content-Type", "application/json")
+	if apiKey := os.Getenv("OPENAI_API_KEY"); apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+	
+	res, err := client.Do(req)
+	if err != nil {
+		logging.Debug("Failed to list local models", "error", err, "endpoint", modelsEndpoint)
 		return []localModel{}
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		logging.Debug("Failed to list local models",
-			"status", res.StatusCode,
-			"endpoint", modelsEndpoint,
-		)
+		logging.Debug("Failed to list local models", "status", res.StatusCode, "endpoint", modelsEndpoint)
 		return []localModel{}
 	}
 
 	var modelList localModelList
 	if err = json.NewDecoder(res.Body).Decode(&modelList); err != nil {
-		logging.Debug("Failed to list local models",
-			"error", err,
-			"endpoint", modelsEndpoint,
-		)
+		logging.Debug("Failed to decode model list", "error", err, "endpoint", modelsEndpoint)
 		return []localModel{}
 	}
 
@@ -112,11 +133,9 @@ func listLocalModels(modelsEndpoint string) []localModel {
 					"object", model.Object,
 					"type", model.Type,
 				)
-
 				continue
 			}
 		}
-
 		supportedModels = append(supportedModels, model)
 	}
 
