@@ -29,7 +29,8 @@ func init() {
 		if err != nil {
 			logging.Debug("Failed to parse local endpoint", "error", err, "endpoint", endpoint)
 			// 파싱 실패시 하드코딩 모델 사용
-			goto hardcoded
+			useHardcodedModel()
+			return
 		}
 
 		load := func(url *url.URL, path string) []localModel {
@@ -44,33 +45,34 @@ func init() {
 
 		if len(models) == 0 {
 			logging.Debug("No local models found, using hardcoded model", "endpoint", endpoint)
-			goto hardcoded
+			useHardcodedModel()
+			return
 		}
 
 		loadLocalModels(models)
 		viper.SetDefault("providers.local.apiKey", "dummy")
 		ProviderPopularity[ProviderLocal] = 0
 		logging.Info("Successfully loaded local models", "count", len(models))
-		return
-
-	hardcoded:
-		// 자동 발견 실패시 하드코딩 모델 사용
-		logging.Info("Using hardcoded Qwen3-32B model")
-		qwenModel := localModel{
-			ID:                  "Qwen3-32B",
-			Object:              "model",
-			Type:                "llm",
-			State:               "loaded",
-			MaxContextLength:    32768,
-			LoadedContextLength: 32768,
-		}
-		
-		models := []localModel{qwenModel}
-		loadLocalModels(models)
-		
-		viper.SetDefault("providers.local.apiKey", "dummy")
-		ProviderPopularity[ProviderLocal] = 0
 	}
+}
+
+func useHardcodedModel() {
+	// 자동 발견 실패시 하드코딩 모델 사용
+	logging.Info("Using hardcoded Qwen3-32B model")
+	qwenModel := localModel{
+		ID:                  "Qwen3-32B",
+		Object:              "model",
+		Type:                "llm",
+		State:               "loaded",
+		MaxContextLength:    32768,
+		LoadedContextLength: 32768,
+	}
+	
+	models := []localModel{qwenModel}
+	loadLocalModels(models)
+	
+	viper.SetDefault("providers.local.apiKey", "dummy")
+	ProviderPopularity[ProviderLocal] = 0
 }
 
 type localModelList struct {
