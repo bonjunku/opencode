@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -104,7 +105,8 @@ func (w *writeTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 	}
 
 	if params.FilePath == "" {
-		return NewTextErrorResponse("file_path is required"), nil
+		// Generate a default filename based on content
+		params.FilePath = generateDefaultFilename(params.Content)
 	}
 
 	if params.Content == "" {
@@ -224,4 +226,105 @@ func (w *writeTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 			Removals:  removals,
 		},
 	), nil
+}
+
+// generateDefaultFilename creates a filename based on content analysis
+func generateDefaultFilename(content string) string {
+	// Trim whitespace and get first few lines for analysis
+	lines := strings.Split(strings.TrimSpace(content), "\n")
+	if len(lines) == 0 {
+		return "output.txt"
+	}
+
+	// Check for common file patterns
+	firstLine := strings.TrimSpace(lines[0])
+	contentLower := strings.ToLower(content)
+
+	// Programming languages detection
+	if strings.HasPrefix(firstLine, "#!/usr/bin/env python") || strings.HasPrefix(firstLine, "#!/usr/bin/python") ||
+		strings.Contains(contentLower, "def ") || strings.Contains(contentLower, "import ") ||
+		strings.Contains(contentLower, "from ") || regexp.MustCompile(`print\s*\(`).MatchString(contentLower) {
+		return "script.py"
+	}
+
+	if strings.Contains(contentLower, "#include") || strings.Contains(contentLower, "int main") ||
+		strings.Contains(contentLower, "std::") || strings.Contains(contentLower, "cout") {
+		return "program.cpp"
+	}
+
+	if strings.Contains(contentLower, "#include") && strings.Contains(contentLower, "printf") {
+		return "program.c"
+	}
+
+	if strings.Contains(contentLower, "public class") || strings.Contains(contentLower, "public static void main") ||
+		strings.Contains(contentLower, "System.out.println") {
+		return "Program.java"
+	}
+
+	if strings.Contains(contentLower, "function") || strings.Contains(contentLower, "console.log") ||
+		strings.Contains(contentLower, "const ") || strings.Contains(contentLower, "let ") ||
+		strings.Contains(contentLower, "var ") || strings.Contains(contentLower, "=>") {
+		return "script.js"
+	}
+
+	if strings.Contains(contentLower, "func ") || strings.Contains(contentLower, "package main") ||
+		strings.Contains(contentLower, "import \"") || strings.Contains(contentLower, "fmt.") {
+		return "program.go"
+	}
+
+	if strings.Contains(contentLower, "fn ") || strings.Contains(contentLower, "println!") ||
+		strings.Contains(contentLower, "use std::") {
+		return "program.rs"
+	}
+
+	if strings.Contains(contentLower, "<!DOCTYPE") || strings.Contains(contentLower, "<html") ||
+		strings.Contains(contentLower, "<body") || strings.Contains(contentLower, "<div") {
+		return "index.html"
+	}
+
+	if strings.Contains(contentLower, "<?xml") || strings.Contains(contentLower, "<xml") {
+		return "document.xml"
+	}
+
+	if strings.Contains(contentLower, "{") && strings.Contains(contentLower, "}") &&
+		(strings.Contains(contentLower, "\"") || strings.Contains(contentLower, ":")) {
+		return "data.json"
+	}
+
+	// Shell scripts
+	if strings.HasPrefix(firstLine, "#!/bin/bash") || strings.HasPrefix(firstLine, "#!/bin/sh") ||
+		strings.Contains(contentLower, "echo ") || strings.Contains(contentLower, "if [") {
+		return "script.sh"
+	}
+
+	// SQL
+	if strings.Contains(contentLower, "select ") || strings.Contains(contentLower, "create table") ||
+		strings.Contains(contentLower, "insert into") || strings.Contains(contentLower, "update ") {
+		return "query.sql"
+	}
+
+	// Markdown
+	if strings.HasPrefix(firstLine, "#") || strings.Contains(contentLower, "##") ||
+		strings.Contains(contentLower, "```") || strings.Contains(contentLower, "**") {
+		return "document.md"
+	}
+
+	// Configuration files
+	if strings.Contains(contentLower, "[") && strings.Contains(contentLower, "]") &&
+		strings.Contains(contentLower, "=") {
+		return "config.ini"
+	}
+
+	// YAML
+	if strings.Contains(contentLower, "---") || regexp.MustCompile(`^\s*\w+:\s*`).MatchString(firstLine) {
+		return "config.yaml"
+	}
+
+	// CSV
+	if strings.Contains(contentLower, ",") && strings.Count(firstLine, ",") > 1 {
+		return "data.csv"
+	}
+
+	// Default to text file
+	return "output.txt"
 }

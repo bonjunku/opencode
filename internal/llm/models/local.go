@@ -61,7 +61,13 @@ func useHardcodedModel() {
 	// 환경 변수에서 모델명 가져오기, 없으면 기본값 사용
 	modelName := os.Getenv("LOCAL_MODEL_NAME")
 	if modelName == "" {
-		modelName = "Qwen3-32B"
+		// 설정 파일에서 로컬 모델 이름 가져오기
+		configModelName := viper.GetString("local.model")
+		if configModelName != "" {
+			modelName = configModelName
+		} else {
+			modelName = "Qwen3-32B"
+		}
 	}
 	
 	logging.Info("Using hardcoded local model", "model", modelName)
