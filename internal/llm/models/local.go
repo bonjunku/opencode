@@ -58,9 +58,15 @@ func init() {
 
 func useHardcodedModel() {
 	// 자동 발견 실패시 하드코딩 모델 사용
-	logging.Info("Using hardcoded Qwen3-32B model")
-	qwenModel := localModel{
-		ID:                  "Qwen3-32B",
+	// 환경 변수에서 모델명 가져오기, 없으면 기본값 사용
+	modelName := os.Getenv("LOCAL_MODEL_NAME")
+	if modelName == "" {
+		modelName = "Qwen3-32B"
+	}
+	
+	logging.Info("Using hardcoded local model", "model", modelName)
+	fallbackModel := localModel{
+		ID:                  modelName,
 		Object:              "model",
 		Type:                "llm",
 		State:               "loaded",
@@ -68,7 +74,7 @@ func useHardcodedModel() {
 		LoadedContextLength: 32768,
 	}
 	
-	models := []localModel{qwenModel}
+	models := []localModel{fallbackModel}
 	loadLocalModels(models)
 	
 	viper.SetDefault("providers.local.apiKey", "dummy")

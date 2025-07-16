@@ -622,7 +622,7 @@ If using an explicit github token, you may either set the $GITHUB_TOKEN environm
 ## Using a self-hosted model provider
 
 OpenCode can also load and use models from a self-hosted (OpenAI-like) provider.
-This is useful for developers who want to experiment with custom models.
+This is useful for developers who want to experiment with custom models or use internal LLM servers.
 
 ### Configuring a self-hosted provider
 
@@ -633,20 +633,176 @@ This will cause OpenCode to load and use the models from the specified endpoint.
 LOCAL_ENDPOINT=http://localhost:1235/v1
 ```
 
-### Configuring a self-hosted model
+### Environment Variables for Local Models
 
-You can also configure a self-hosted model in the configuration file under the `agents` section:
+| Environment Variable | Purpose | Example |
+|---------------------|---------|---------|
+| `LOCAL_ENDPOINT` | Self-hosted model endpoint | `http://localhost:1235/v1` |
+| `LOCAL_MODEL_NAME` | Fallback model name when auto-discovery fails | `Qwen3-32B` |
+| `OPENAI_API_KEY` | API key for authentication (if required) | `your-api-key` |
 
+### Supported Local Models
+
+OpenCode supports various local model configurations. Here are examples for popular models:
+
+#### Windows Configuration
+
+For Windows users, create `.opencode.json` in your home directory:
+```
+C:\Users\[username]\.opencode.json
+```
+
+Set environment variables:
+```cmd
+# Set environment variables (permanent)
+setx LOCAL_ENDPOINT "http://your-internal-server:8080"
+setx LOCAL_MODEL_NAME "HCP-Common"
+
+# Or use PowerShell
+[Environment]::SetEnvironmentVariable("LOCAL_ENDPOINT", "http://your-server:8080", "User")
+[Environment]::SetEnvironmentVariable("LOCAL_MODEL_NAME", "HCP-Common", "User")
+```
+
+#### Model Configuration Examples
+
+**For HCP-Common:**
 ```json
 {
+  "providers": {
+    "local": {
+      "apiKey": "dummy"
+    }
+  },
   "agents": {
     "coder": {
-      "model": "local.granite-3.3-2b-instruct@q8_0",
-      "reasoningEffort": "high"
+      "model": "local.HCP-Common",
+      "maxTokens": 8000
+    },
+    "summarizer": {
+      "model": "local.HCP-Common",
+      "maxTokens": 4000
+    },
+    "task": {
+      "model": "local.HCP-Common",
+      "maxTokens": 2000
+    },
+    "title": {
+      "model": "local.HCP-Common",
+      "maxTokens": 100
     }
   }
 }
 ```
+
+**For DeepSeek-R1-0528:**
+```json
+{
+  "providers": {
+    "local": {
+      "apiKey": "dummy"
+    }
+  },
+  "agents": {
+    "coder": {
+      "model": "local.DeepSeek-R1-0528",
+      "maxTokens": 6000
+    },
+    "summarizer": {
+      "model": "local.DeepSeek-R1-0528",
+      "maxTokens": 3000
+    },
+    "task": {
+      "model": "local.DeepSeek-R1-0528",
+      "maxTokens": 2000
+    },
+    "title": {
+      "model": "local.DeepSeek-R1-0528",
+      "maxTokens": 100
+    }
+  }
+}
+```
+
+**For A.X-4.0:**
+```json
+{
+  "providers": {
+    "local": {
+      "apiKey": "dummy"
+    }
+  },
+  "agents": {
+    "coder": {
+      "model": "local.A.X-4.0",
+      "maxTokens": 10000
+    },
+    "summarizer": {
+      "model": "local.A.X-4.0",
+      "maxTokens": 5000
+    },
+    "task": {
+      "model": "local.A.X-4.0",
+      "maxTokens": 3000
+    },
+    "title": {
+      "model": "local.A.X-4.0",
+      "maxTokens": 100
+    }
+  }
+}
+```
+
+**For Qwen3-30B-A3B-Thinking:**
+```json
+{
+  "providers": {
+    "local": {
+      "apiKey": "dummy"
+    }
+  },
+  "agents": {
+    "coder": {
+      "model": "local.Qwen3-30B-A3B-Thinking",
+      "maxTokens": 12000
+    },
+    "summarizer": {
+      "model": "local.Qwen3-30B-A3B-Thinking",
+      "maxTokens": 6000
+    },
+    "task": {
+      "model": "local.Qwen3-30B-A3B-Thinking",
+      "maxTokens": 4000
+    },
+    "title": {
+      "model": "local.Qwen3-30B-A3B-Thinking",
+      "maxTokens": 100
+    }
+  }
+}
+```
+
+### Model Auto-Discovery
+
+OpenCode automatically tries to discover available models from your local endpoint. If discovery fails, it falls back to the model specified in the `LOCAL_MODEL_NAME` environment variable, or defaults to `Qwen3-32B`.
+
+The auto-discovery process:
+1. Checks `[endpoint]/api/v0/models` (LMStudio format)
+2. Falls back to `[endpoint]/v1/models` (OpenAI format)
+3. Uses hardcoded fallback model if both fail
+
+### Using Local Models
+
+Once configured, start OpenCode normally:
+
+```bash
+# Windows
+opencode-windows-amd64.exe
+
+# macOS/Linux
+./opencode
+```
+
+OpenCode will automatically use your configured local model for all AI interactions.
 
 ## Development
 
