@@ -1,0 +1,53 @@
+#!/bin/bash
+set -e
+
+# Get the latest Git tag
+git fetch --force --tags
+latest_tag=$(git tag --sort=committerdate | grep -E 'v[0-9]' | tail -1)
+
+# If there is no tag, start with v0.4.0
+if [ -z "$latest_tag" ]; then
+    VERSION="v0.4.0"
+else
+    echo "Latest tag: $latest_tag"
+    
+    # Remove 'v' prefix and split into parts
+    version_number=${latest_tag#v}
+    IFS='.' read -ra VERSION_PARTS <<< "$version_number"
+    
+    # Increment patch version
+    patch_number=${VERSION_PARTS[2]}
+    ((patch_number++))
+    VERSION="v${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.$patch_number"
+fi
+
+echo "Building version: $VERSION"
+
+LDFLAGS="-s -w -X github.com/opencode-ai/opencode/internal/version.Version=$VERSION"
+
+echo "Building binaries for version $VERSION..."
+
+# Clean previous builds
+rm -f opencode-*
+
+# Build for all platforms
+echo "Building macOS AMD64..."
+GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$LDFLAGS" -o opencode-darwin-amd64
+
+echo "Building macOS ARM64..."
+GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags "$LDFLAGS" -o opencode-darwin-arm64
+
+echo "Building Linux AMD64..."
+GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$LDFLAGS" -o opencode-linux-amd64
+
+echo "Building Windows AMD64..."
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$LDFLAGS" -o opencode-windows-amd64.exe
+
+echo "Built binaries:"
+ls -la opencode-*
+
+echo ""
+echo "To create a release, run:"
+echo "git tag $VERSION"
+echo "git push origin $VERSION"
+echo "gh release create $VERSION opencode-darwin-amd64 opencode-darwin-arm64 opencode-linux-amd64 opencode-windows-amd64.exe --title \"$VERSION\" --notes \"Release $VERSION\""
